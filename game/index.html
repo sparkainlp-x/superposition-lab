@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Superposition Arena — SYNTHETIC scientific game</title>
+<style>
+:root{--bg:#05070f;--panel:#0d1424;--ink:#e8f0ff;--dim:#8fa3c4;--cyan:#38e1ff;--gold:#ffcf5c;--red:#ff6b81;--green:#5cf2a7;--line:#20304d}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 700px at 50% -10%,#12203a,#05070f);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}header{padding:28px 20px 10px;text-align:center}h1{margin:0;font-size:clamp(28px,5vw,48px);letter-spacing:.5px}h1 span{color:var(--cyan)}.tag{color:var(--dim);margin-top:8px}.wrap{max-width:1180px;margin:20px auto;padding:0 18px;display:grid;grid-template-columns:minmax(320px,1fr) 340px;gap:18px}@media(max-width:900px){.wrap{grid-template-columns:1fr}}.panel{background:linear-gradient(180deg,rgba(13,20,36,.95),rgba(8,12,22,.95));border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.arena{position:relative;aspect-ratio:1;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.cell{position:relative;border:1px solid var(--line);border-radius:14px;background:#070c17;overflow:hidden}.cell canvas{position:absolute;inset:0;width:100%;height:100%}.cell .label{position:absolute;left:10px;top:8px;font-size:11px;color:var(--dim);letter-spacing:.08em}.cell .pop{position:absolute;right:10px;top:8px;font-weight:700;color:var(--cyan)}.cell.target{outline:2px solid var(--gold);outline-offset:-2px}.cell.source{outline:2px solid var(--green);outline-offset:-2px}.hud{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.metric{background:#08101d;border:1px solid var(--line);border-radius:12px;padding:10px}.metric b{display:block;font-size:20px;color:var(--cyan)}.metric span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}.controls{display:grid;gap:12px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.row label{font-size:13px;color:var(--dim)}.row output{font-variant-numeric:tabular-nums;color:var(--ink)}.input,select,button{width:100%}input[type=range]{width:100%;accent-color:var(--cyan)}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{border:1px solid var(--line);background:#101a2d;color:var(--ink);border-radius:10px;padding:10px;font-weight:650;cursor:pointer}button:hover{border-color:var(--cyan);color:var(--cyan)}.primary{background:linear-gradient(135deg,#0f4c5c,#123c66);border-color:#1d6d85}.level{padding:10px;border:1px solid var(--line);border-radius:12px;background:#08101d}.level b{color:var(--gold)}.note{color:var(--dim);font-size:12px;margin-top:10px}.win{color:var(--green);font-weight:750}.lose{color:var(--red);font-weight:750}.phasegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.phase{background:#08101d;border:1px solid var(--line);border-radius:10px;padding:8px}.phase span{display:block;font-size:10px;color:var(--dim);margin-bottom:4px}.footer{max-width:1180px;margin:20px auto;padding:0 18px 35px;color:var(--dim);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+<h1>Superposition <span>Arena</span></h1>
+<div class="tag">Guide a coherent excitation through a 3×3 lattice. Tune phase, coupling and dephasing—without exceeding the control budget.</div>
+</header>
+<main class="wrap">
+<section class="panel">
+<div class="arena" id="arena"></div>
+<div class="hud">
+<div class="metric"><b id="target">0.0%</b><span>Target delivery</span></div>
+<div class="metric"><b id="coherence">0.00</b><span>Mean coherence</span></div>
+<div class="metric"><b id="budget">100%</b><span>Control budget</span></div>
+</div>
+<div id="status" class="note">SYNTHETIC CLASSICAL SIMULATION. Tune the fields and press <b>Evolve</b>.</div>
+</section>
+<section class="panel controls">
+<div class="level"><b>Level:</b> <span id="levelName">Phase Lock</span><div id="levelGoal" class="note">Deliver at least 45% of the excitation to the gold target.</div></div>
+<div class="row"><label for="coupling">Coupling</label><output id="couplingOut">0.35</output></div>
+<input class="input" id="coupling" type="range" min="0" max="1" step="0.01" value="0.35">
+<div class="row"><label for="dephasing">Dephasing</label><output id="dephasingOut">0.05</output></div>
+<input class="input" id="dephasing" type="range" min="0" max="0.5" step="0.005" value="0.05">
+<div class="row"><label for="disorder">Disorder</label><output id="disorderOut">0.10</output></div>
+<input class="input" id="disorder" type="range" min="0" max="0.5" step="0.01" value="0.10">
+<div class="phasegrid" id="phaseGrid"></div>
+<div class="buttons">
+<button id="evolve" class="primary">Evolve</button>
+<button id="reset">Reset</button>
+<button id="randomize">Random phases</button>
+<button id="next">Next level</button>
+</div>
+<div class="note">The model uses a 9-site tight-binding Hamiltonian. Phase controls alter relative site phases; they do not create energy. Target delivery, coherence and budget are synthetic simulation metrics.</div>
+</section>
+</main>
+<div class="footer">SYNTHETIC educational simulation • no quantum hardware • no physical accelerator • no energy-creation claim</div>
+<script>
+const N=9,SOURCE=0,TARGET=8,DT=.08,STEPS=180;
+let state,history=[],levels=[
+ {name:"Phase Lock",goal:"Deliver at least 45% of the excitation to the gold target.",target:.45,disorder:.10,dephasing:.05,budget:100},
+ {name:"Disorder Crossing",goal:"Deliver at least 30% despite stronger disorder.",target:.30,disorder:.28,dephasing:.05,budget:80},
+ {name:"Noise Survivors",goal:"Deliver at least 22% under stronger dephasing.",target:.22,disorder:.18,dephasing:.22,budget:65},
+ {name:"Precision Route",goal:"Deliver at least 35% with a tighter control budget.",target:.35,disorder:.22,dephasing:.10,budget:50}
+],level=0,budgetUsed=0;
+const arena=document.getElementById("arena"),phaseGrid=document.getElementById("phaseGrid");
+for(let i=0;i<N;i++){const d=document.createElement("div");d.className="cell"+(i===TARGET?" target":i===SOURCE?" source":"");d.innerHTML=`<canvas></canvas><div class="label">SITE ${i+1}</div><div class="pop">0%</div>`;arena.appendChild(d)}
+for(let i=0;i<N;i++){const p=document.createElement("div");p.className="phase";p.innerHTML=`<span>PHASE ${i+1}</span><input type="range" min="0" max="6.283" step="0.01" value="0">`;phaseGrid.appendChild(p)}
+const cells=[...document.querySelectorAll(".cell")],canvases=cells.map(c=>c.querySelector("canvas")),pops=cells.map(c=>c.querySelector(".pop")),phaseInputs=[...phaseGrid.querySelectorAll("input")];
+function idx(i,j){return 3*i+j}
+function buildH(){const coupling=+coupling.value,disorder=+disorder.value,rng=mulberry32(42+level*977);let H=Array.from({length:N},()=>Array(N).fill(0));for(let i=0;i<3;i++)for(let j=0;j<3;j++)H[idx(i,j)][idx(i,j)]=gauss(rng)*disorder;const edges=[];for(let i=0;i<3;i++)for(let j=0;j<3;j++){if(j<2)edges.push([idx(i,j),idx(i,j+1)]);if(i<2)edges.push([idx(i,j),idx(i+1,j)])}for(const[a,b]of edges){const ph=phaseInputs[a].valueAsNumber-phaseInputs[b].valueAsNumber,v=coupling*Math.cos(ph);H[a][b]+=v;H[b][a]+=v}return H}
+function gauss(rng){let u=0,v=0;while(!u)u=rng();while(!v)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function expm(H,dt){const n=N,a=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?1:0)),term=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?1:0));for(let k=1;k<=24;k++){term=term.map((row,i)=>row.map((_,j)=>row[j]*dt/k));for(let i=0;i<n;i++)for(let j=0;j<n;j++){let s=0;for(let l=0;l<n;l++)s+=term[i][l]*H[l][j];term[i][j]=s}for(let i=0;i<n;i++)for(let j=0;j<n;j++)a[i][j]+=term[i][j]/factorial(k)}return a}
+function factorial(n){let r=1;for(let i=2;i<=n;i++)r*=i;return r}
+function evolve(){if(budgetUsed>=levels[level].budget){setStatus("Control budget exhausted. Reset or reduce coupling/dephasing.","lose");return}let psi=Array(N).fill(0);psi[SOURCE]=1;const H=buildH(),gamma=+dephasing.value;for(let s=0;s<STEPS;s++){const U=expm(H,DT);psi=matvec(U,psi);const decay=Math.exp(-gamma*DT);psi=psi.map(z=>z*decay);const magnitude=Math.sqrt(psi.reduce((a,z)=>a+(z.re*z.re+z.im*z.im),0));if(magnitude>0)psi=psi.map(z=>({re:z.re/magnitude,im:z.im/magnitude}))}state=psi;history.push({target:prob(TARGET),coherence:meanCoherence()});budgetUsed=Math.min(levels[level].budget,budgetUsed+Math.round((+coupling.value*35+ +dephasing.value*80)));render();check()}
+function matvec(M,v){return M.map(row=>row.reduce((a,x,k)=>({re:a.re+x.re*v[k].re-x.im*v[k].im,im:a.im+x.re*v[k].im+x.im*v[k].re}),{re:0,im:0}))}
+function prob(i){const z=state[i];return z.re*z.re+z.im*z.im}
+function meanCoherence(){let s=0,c=0;for(let i=0;i<N;i++)for(let j=0;j<N;j++)if(i!==j){s+=Math.hypot(state[i].re*state[j].re+state[i].im*state[j].im,state[i].re*state[j].im-state[i].im*state[j].re);c++}return s/c}
+function render(){for(let i=0;i<N;i++){const p=prob(i);pops[i].textContent=(p*100).toFixed(1)+"%";draw(i,p)}target.textContent=(prob(TARGET)*100).toFixed(1)+"%";coherence.textContent=meanCoherence().toFixed(2);budget.textContent=Math.max(0,levels[level].budget-budgetUsed)+"%"}
+function draw(i,p){const cv=canvases[i],ctx=cv.getContext("2d"),w=cv.width=cv.clientWidth,h=cv.height=cv.clientHeight;ctx.clearRect(0,0,w,h);const rings=6;for(let r=1;r<=rings;r++){ctx.beginPath();ctx.arc(w/2,h/2,(r/rings)*Math.min(w,h)*.45,0,7);ctx.strokeStyle=`rgba(56,225,255,${.05+r*.025})`;ctx.stroke()}const radius=Math.sqrt(p)*Math.min(w,h)*.42;const g=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,Math.max(radius,1));g.addColorStop(0,i===TARGET?"rgba(255,207,92,.95)":i===SOURCE?"rgba(92,242,167,.9)":"rgba(56,225,255,.9)");g.addColorStop(1,"transparent");ctx.fillStyle=g;ctx.beginPath();ctx.arc(w/2,h/2,Math.max(radius,2),0,7);ctx.fill()}
+function check(){const p=prob(TARGET),goal=levels[level].target;if(p>=goal){setStatus(`Challenge met: ${(p*100).toFixed(1)}% delivered. Try improving efficiency or continue to the next level.`,"win")}else if(budgetUsed>=levels[level].budget){setStatus(`Budget exhausted at ${(p*100).toFixed(1)}%. Reset and retune the phase pattern.`,"lose")}else{setStatus(`Current delivery: ${(p*100).toFixed(1)}%. Goal: ${(goal*100).toFixed(0)}%.`)}}
+function setStatus(text,cls=""){const el=document.getElementById("status");el.className="note "+cls;el.innerHTML=text}
+function reset(){state=Array.from({length:N},(_,i)=>({re:i===SOURCE?1:0,im:0}));history=[];budgetUsed=0;render();setStatus(`Level ${level+1}: ${levels[level].name}. ${levels[level].goal}`)}
+function loadLevel(){const L=levels[level];disorder.value=L.disorder;dephasing.value=L.dephasing;levelName.textContent=L.name;levelGoal.textContent=L.goal;phaseInputs.forEach(x=>x.value=(Math.random()*6.283).toFixed(2));updateOutputs();reset()}
+function updateOutputs(){couplingOut.textContent=(+coupling.value).toFixed(2);dephasingOut.textContent=(+dephasing.value).toFixed(3);disorderOut.textContent=(+disorder.value).toFixed(2)}
+document.querySelectorAll("input").forEach(x=>x.addEventListener("input",()=>{updateOutputs();render()}));
+evolve.onclick=evolve;reset.onclick=reset;randomize.onclick=()=>{phaseInputs.forEach(x=>x.value=(Math.random()*6.283).toFixed(2));render()};next.onclick=()=>{level=(level+1)%levels.length;loadLevel()};
+loadLevel();
+</script>
+</body>
+</html>

@@ -8,6 +8,14 @@ It does **not** simulate quantum hardware, create energy, model a physical
 particle accelerator, or establish a new-physics claim. It is intended as a
 small, reproducible companion to `membrane-arena-3x3`.
 
+## Play the game
+
+**Superposition Arena** is a standalone interactive scientific game:
+[Open `game/index.html`](game/index.html).
+
+Tune phase, coupling and dephasing to guide a coherent excitation to the
+gold target. See [`docs/GAME.md`](docs/GAME.md) for the model and limits.
+
 ## Install
 
 ```bash
